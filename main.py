@@ -10,11 +10,20 @@ def main():  # Главная функция
         N = int(input())
         print("Введите количество тем: ")
         m = int(input())
+        print("Выберите формат исходного документа.")
+        print("1 - .docx \n2 - .txt")
+        format = int(input())
     except ValueError:
         print("Неправильный ввод")
         print("Пожалуйста, введите верное количество")
         return 1
-    fullText = getText('voprosy.docx')  # Работа с вопросами из docx
+    if format != 2 or 1:
+        print("Неверный ввод формата!")
+        return 1
+    if format == 1:
+        fullText = getText('voprosy.docx')  # Работа с вопросами из docx
+    else:
+        fullText = getTxt('voprosy.txt')
     i2 = 1  # Счетчик количества тем, добавленных в словарь
     i3 = 1  # Счетчик вопросов в добавленной теме
     for i in range(len(fullText)):
@@ -76,7 +85,16 @@ def getText(filename):  # Функция для чтения файла типа
         fullText.append(para.text)
     return fullText
 
+def getTxt(filename):
+    fullText = []
+    with open(f'{filename}') as f:
+        for line in f:
+            if line == '\n':
+                fullText.append('')
+            else:
+                fullText.append(line)
+    return fullText
 
-if __name__ == "__main__":  # Если имя - main то скрипт запускается
+if __name__ == "__main__":
     main()
 
