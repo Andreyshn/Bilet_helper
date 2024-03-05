@@ -36,9 +36,9 @@ def create_connection(host_name):
     except Error as e:
         print(f'error {e} is occurred')
     return connection
+'''
 
 
-
-create_connection("localhost")'''
+#create_connection("localhost")
 
 
