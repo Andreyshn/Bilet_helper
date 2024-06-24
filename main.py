@@ -1,82 +1,166 @@
+from docx.shared import Pt
 from docx import Document
-import time
-import random
+import random as rnd
+import time as t
+from itertools import chain
 
+from numpy import true_divide
+from insert import ex, ins
+class Question:
+    def __init__(self,question,topic,difficulty):
+        self.question = question # вопрос
+        self.topic = topic #номер темы
+        self.difficulty = difficulty #сложность
+        self.used = 0 #сколько раз использован вопрос
 
-def main():  # Главная функция
-    d = {}
+def main():
+    Ncase = 0
+    d = [] #список списков объектов вопрос
+    theme = [0.0] #список сложности тем
     try:
         print("Введите количество билетов: ")
-        N = int(input())
-        print("Введите количество тем: ")
-        m = int(input())
+        bilet_count = int(input())
+        print("Введите количество вопросов в билете: ")
+        theme_count = int(input()) #количество вопросов
     except ValueError:
         print("Неправильный ввод")
         print("Пожалуйста, введите верное количество")
         return 1
-    fullText = getText('voprosy.docx')  # Работа с вопросами из docx
-    i2 = 1  # Счетчик количества тем, добавленных в словарь
-    i3 = 1  # Счетчик вопросов в добавленной теме
-    for i in range(len(fullText)):
-        if i + 1 == len(fullText) and i2 < m:
-            print("Заданного вами количества тем нет в файле")
-            print("Пожалуйста, исправьте документ, дописав темы")
-            print("Либо исправьте введенное количество")
-            return 1
-        if fullText[i] == '':  # проверка пустой строки
-            if i2 == m:  # проверка достаточности тем
-                print("Необходимое количество тем сформировано")
-                break
-            i2 += 1  # инкрементация счетчиков
-            i3 = 1
+    
+    full_text = getText('voprosy.docx')
+    theme_in_doc= 1  # Счетчик количества тем, добавленных в словарь
+    q_imp = 0 #Сложность вопроса
+    count_q = 0 #счетчик вопросов каждой отдельной темы
+    q = [] #список вопросов темы
+    for i in range(len(full_text)):
+        if full_text[i] == '':  # пустая строка - переход на другую тему
+            if q != []:
+                d.append(q)
+            theme[theme_in_doc-1] /= count_q #среднее значение сложности темы
+            theme_in_doc+= 1
+            count_q = 0
+            theme.append(0)
+            q = [] #список вопросов темы
         else:
-            d[f'{i2}_{i3}'] = fullText[i]
-            i3 += 1
-        d[i2] = i3 - 1  # добавление в словарь счета вопросов каждой темы
-    document = Document()  # Создание нового документа
-    document.add_heading('Билеты', 0)  # Создание заголовка
-    random.seed(time.time())
-    for i in range(1, N + 1):  # Начало заполнения документа
-        document.add_heading(f'Билет Номер: {i}', level=1)  # Добавление заголовка с номером билета
-        if DocMake(document, m, d) == 1:  # функция, заполняющая основной документ
-            return 1
-    document.save('bilet.docx')  # Сохранение документа
-    document = Document()  # Создание документа с невошедшими вопросами
-    document.add_heading("Невошедшие вопросы", 0)
-    for i2 in range(1, m + 1):
-        document.add_heading(f'Тема {i2}')
-        for i in range(0, d[i2]):
-            name = f'{i2}_{i+1}'  # генерация имени
-            document.add_paragraph(f'{d[name]}', style=f'List Bullet')  # постановка строки в документ
-    document.save('non_bilet.docx')
+            try:
+                q_imp = int(full_text[i][-1])
+                q.append(Question(full_text[i][:-1],theme_in_doc,q_imp)) #сложность - последняя цифра вопроса
+            except ValueError:
+                q_imp = 5
+                q.append(Question(full_text[i],theme_in_doc,q_imp)) #если сложность не задана - равна 5
+            finally:
+                theme[theme_in_doc-1] += q_imp
+                count_q += 1
+    d.append(q)
+    theme[theme_in_doc-1] /= count_q #среднее значение сложности темы
+    target_diff = int(sum(theme) / theme_in_doc * theme_count) #целевая сложность билета
+    new_d = list(chain.from_iterable(d))
+    if theme_count == theme_in_doc:
+        Ncase = 1
+    elif theme_count > theme_in_doc:
+        Ncase = 2
+        rnd.shuffle(new_d)
+    else:
+        Ncase = 3
+    rdy = equality(new_d,theme_in_doc,theme_count,bilet_count,target_diff, Ncase)
+    ins(rdy, theme_count)
+    print(f'Сформировано: {len(rdy)} билетов') # type: ignore
     return 0
 
 
-def DocMake(document, m, d):  # Функция для заполнения документов
-    for i2 in range(1, m + 1):
-        if d[i2] == 0:  # Преждевременный выход из цикла
-            print("Закончились вопросы!")  # при случае нехватки вопросов
-            print("Пожалуйста, добавьте недостающие вопросы в разделы.")
-            return 1
-        count = random.randint(1, d[i2])
-        name = f'{i2}_{count}'  # сборка кодового значения по шаблону
-        document.add_paragraph(f'{d[name]}', style=f'List Bullet')  # добавление самого билета
-        d.pop(name)  # удаление использованного билета из словаря
-        if count != d[i2]:
-            name2 = f'{i2}_{d[i2]}'  # сборка названия максимального элемента
-            d[name] = d[name2]
-            d.pop(name2)
-        d[i2] = d[i2] - 1  # скручивание счетчика количества
+
+def equality(d,theme_in_doc,theme_count,bilet_count,target_diff, Ncase):
+    rnd.seed(t.time())
+    rdy = []
+    i = 0
+    step = 0
+    allowed_rep = 1
+    #rnd.shuffle(d)
+    while i < bilet_count:
+        bilet = algo(target_diff, theme_count, d, step, allowed_rep, Ncase)
+        if len(bilet) < theme_count: # type: ignore
+            print("Больше нет билетов с целевой сложностью")
+            print("Произвожу увеличение цели")
+            step += 1
+            if target_diff - step == 0:
+                print("Невозможно создать больше билетов!")
+                break
+            allowed_rep += 1
+            if Ncase == 2: 
+                rnd.shuffle(d)
+        else:
+            #print("Билет сформирован, попал под", target_diff, "+-", step)
+            rdy.append(bilet)
+            i += 1
+    return rdy
 
 
-def getText(filename):  # Функция для чтения файла типа .docx
+
+def algo(target_diff, theme_count,d, step,allowed_rep, Ncase):
+    current_diff = 0 #текущая сложность
+    rdy = []
+    i = 0
+    themes = [-1] # повторение тем вопросов
+    while i < len(d):
+        if d[i].used < allowed_rep and foo(Ncase, d[i].topic, themes): #вопрос можно использовать(повторения и темы)
+            current_diff += d[i].difficulty #проверяем сложность
+            if current_diff <= target_diff + step: #если меньше/равен максимального порога
+                if len(rdy)+ 1 == theme_count: #этот вопрос последний из необходимых
+                    if current_diff == target_diff - step or current_diff == target_diff + step: #и он равен нашей цели
+                        d[i].used += 1 #мы его используем
+                        rdy.append(d[i].question) #добавляем
+                        print("Билет сформирован, имеет сложность:", current_diff)
+                        return rdy #завершаем прогонку
+                    else: #он последний, но цели не равен
+                        current_diff -= d[i].difficulty #убираем его из счета
+                else: #вопрос не последний из необходимых, мы можем добавить еще
+                    rdy.append(d[i].question) #мы добавляем ЕГО
+                    themes.append(d[i].topic)
+                    d[i].used += 1 #и используем
+                    last_added = i #запоминаем его место, чтобы в случае чего бахнуть
+            else: #мы превысили максимальный предел вопросов (использовав последний)
+                current_diff -= d[i].difficulty #убираем его из счета
+        else: #вопрос еще нельзя использовать
+            pass
+        try:
+            if i + 1 == len(d) and len(rdy) < theme_count: #это последний вопрос в принципе, но нужно еще пройти
+                i = last_added
+                rdy.pop()
+                themes.pop()
+                d[i].used -= 1
+                current_diff -= d[i].difficulty
+            i += 1
+        except IndexError:
+            return []
+        
+    else:
+        print("мы прошлись по всем вопросам")
+        return []
+    
+def foo(*args):
+    Ncase, q, themes = args
+    if Ncase == 1:
+        if q not in themes:
+            return True
+        else:
+            return False
+    else:
+        if q != themes[-1]:
+            return True
+        else:
+            return False
+
+
+def getText(filename):
     doc = Document(filename)
-    fullText = []
-    for para in doc.paragraphs:  # Берем текст из параграфа и записываем его в строку
-        fullText.append(para.text)
-    return fullText
+    full_text = []
+    for para in doc.paragraphs:
+        full_text.append(para.text)
+    return full_text
 
-
-if __name__ == "__main__":  # Если имя - main то скрипт запускается
-    main()
-
+def formatDoc(doc):
+    doc.styles['Normal'].font.name = 'Times New Roman'  # Название шрифта
+    doc.styles['Normal'].font.size = Pt(12)  # Размер шрифта
+    
+main()
+input("Для выхода нажмите Enter")

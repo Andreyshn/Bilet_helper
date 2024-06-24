@@ -19,3 +19,4 @@ A simple script, allowing sorting exam bilets
 
 ## **REQ.**
 > python-docx and its dependecies
+https://python-docx.readthedocs.io/en/latest/
